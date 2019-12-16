@@ -1,0 +1,96 @@
+###########################################################################
+# Título:      AAPS-API Docker Copose (antiguo)
+# Ubicación:   aapsapi/docker-compose.yml
+# Descripción: 
+#   Archivo de orquestación de contenedores del servicio de sincronización
+#   y del servicio de acceso REST-API y aplicación administrativa.
+#   Versión antigua. 
+###########################################################################
+
+# Versión de Docker-Compose
+version: '3.4'
+
+# Lista de Servicios
+services:
+    # Django: REST-API & Página Administrativa
+    django:
+        container_name: django
+        hostname: django
+        image: django
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        env_file: &env 
+            - config.env
+        command: python manage.py runserver 0.0.0.0:8000
+        restart: unless-stopped
+        depends_on:
+            - django_postgres
+            - traefik
+        networks:
+            - pgnetwork
+        ports:
+            - 8000:8000
+        volumes:
+            - .:/aapsapi
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.django.rule=Host(`192.168.99.101:8000`)
+            - traefik.http.routers.django.entrypoints=web
+    
+    # PostgreSQL: Base de Datos
+    django_postgres:
+        container_name: django_postgres
+        hostname: django_postgres
+        image: postgres
+        env_file: *env
+        restart: unless-stopped
+        networks:
+            - pgnetwork
+        volumes:
+            - ./init_db.sh:/init_db.sh
+
+    # PgAdmin4: Panel de Control de PostgreSQL
+    django_pgadmin:
+        container_name: django_pgadmin
+        hostname: django_pgadmin
+        image: dpage/pgadmin4
+        env_file: *env
+        restart: unless-stopped
+        depends_on:
+            - django_postgres
+            - traefik
+        networks:
+            - pgnetwork
+            - proxy
+        ports:
+            - 5050:80
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.postgres.rule=Host(`192.168.99.101:5050`)
+            - traefik.http.routers.postgres.entrypoints=web
+
+    traefik:
+        image: traefik:2.0
+        container_name: traefik
+        restart: unless-stopped
+        networks: 
+            - proxy
+        ports:
+            - 80:80
+            - 8080:8080
+        volumes:
+            # - ./traefik.toml:/etc/traefik/traefik.toml
+            - ./traefik.yml:/traefik.yml:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        # labels:
+        #     - traefik.enabled=true
+        #     - traefik.http.routers.traefik.entrypoints=http
+        #     - traefik.http.routers.traefik.rule=Host(`192.168.99.101:8080`)
+        #     - traefik.http.middlewares.traefik-auth.basicauth.users=admin:Admin123456"
+  
+networks:
+    proxy:
+        driver: bridge
+    pgnetwork:
+        driver: bridge
