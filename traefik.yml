@@ -1,5 +1,6 @@
 
 api:
+    # insecure: false
     insecure: true
   
 entryPoints:
@@ -10,4 +11,4 @@ providers:
     docker:
         # endpoint: "unix:///var/run/docker.sock"
         exposedByDefault: false
-        # network: proxy
+        network: proxy

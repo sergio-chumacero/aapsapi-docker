@@ -28,15 +28,14 @@ services:
             - django_postgres
             - traefik
         networks:
-            - pgnetwork
-        ports:
-            - 8000:8000
+            - proxy
         volumes:
             - .:/aapsapi
         labels:
-            - traefik.enable=true
-            - traefik.http.routers.django.rule=Host(`192.168.99.101:8000`)
-            - traefik.http.routers.django.entrypoints=web
+            - "traefik.enable=true"
+            - "traefik.http.routers.django_router.rule=Host(`192.168.99.101`) && PathPrefix(`/`)"
+            - "traefik.http.services.django_service.loadbalancer.server.port=8000"
+            - "traefik.http.routers.django_router.entrypoints=web"
     
     # PostgreSQL: Base de Datos
     django_postgres:
@@ -46,7 +45,7 @@ services:
         env_file: *env
         restart: unless-stopped
         networks:
-            - pgnetwork
+            - proxy
         volumes:
             - ./init_db.sh:/init_db.sh
 
@@ -59,16 +58,10 @@ services:
         restart: unless-stopped
         depends_on:
             - django_postgres
-            - traefik
         networks:
-            - pgnetwork
             - proxy
         ports:
             - 5050:80
-        labels:
-            - traefik.enable=true
-            - traefik.http.routers.postgres.rule=Host(`192.168.99.101:5050`)
-            - traefik.http.routers.postgres.entrypoints=web
 
     traefik:
         image: traefik:2.0
@@ -80,17 +73,9 @@ services:
             - 80:80
             - 8080:8080
         volumes:
-            # - ./traefik.toml:/etc/traefik/traefik.toml
             - ./traefik.yml:/traefik.yml:ro
             - /var/run/docker.sock:/var/run/docker.sock:ro
-        # labels:
-        #     - traefik.enabled=true
-        #     - traefik.http.routers.traefik.entrypoints=http
-        #     - traefik.http.routers.traefik.rule=Host(`192.168.99.101:8080`)
-        #     - traefik.http.middlewares.traefik-auth.basicauth.users=admin:Admin123456"
   
 networks:
     proxy:
-        driver: bridge
-    pgnetwork:
         driver: bridge
